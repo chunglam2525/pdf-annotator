@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prettify/r298/prettify.min.css">
+	<link rel="stylesheet" href="./style/jquery.minicolors.css">
+	<link rel="stylesheet" href="./style/pdfannotate.css">
+	<link rel="stylesheet" href="./style/styles.css">
+</head>
+<body>
+<div class="toolbar">
+	<div class="tool">
+		<label for=""><i class="fa fa-magnifying-glass-plus"></i></label>
+		<input class="align-middle" min=".5" max="2" value='1' step=".5" onchange="showVal(this.value)" type="range" />
+	</div>
+	<div class="tool">
+		<button class="tool-button active" title="Free Hand" onclick="enableSelector(event)"><i class="fa fa-hand"></i></button>
+	</div>
+	
+	<div class="tool">
+		<!-- <label for=""><i class="fa-solid fa-droplet"></i></label> -->
+		<input type="text" id="rgba" class="color-picker" data-format="rgb" data-opacity="1" value="rgba(33, 33, 33, 1)">
+	</div>
+	
+	<div class="tool">
+		<button class="tool-button" title="Pencil" onclick="enablePencil(event)"><i class="fa fa-pencil"></i></button>
+		<input type="number" class="form-control text-right text-input" value="1" id="brush-size" max="50">
+	</div>
+
+	<div class="tool">
+		<button class="tool-button" title="Add Text" onclick="enableAddText(event)"><i class="fa fa-font"></i></button>
+		<select id="font-size" class="form-control">
+			<option value="10">10</option>
+			<option value="12">12</option>
+			<option value="16" selected>16</option>
+			<option value="18">18</option>
+			<option value="24">24</option>
+			<option value="32">32</option>
+			<option value="48">48</option>
+			<option value="64">64</option>
+			<option value="72">72</option>
+			<option value="108">108</option>
+		</select>
+	</div>
+
+	<div class="tool">
+		<button class="tool-button" title="Add Arrow" onclick="enableAddArrow(event)"><i class="fa fa-long-arrow-right"></i></button>
+	</div>
+	<div class="tool">
+		<button class="tool-button" title="Add rectangle" onclick="enableRectangle(event)"><i class="fa fa-square"></i></button>
+	</div>
+	<div class="tool">
+		<button class="tool-button" title="Add an Image" onclick="addImage(event)"><i class="fa fa-image"></i></button>
+	</div>
+	<div class="tool">
+		<button class="tool-button" title="Undo lastest add/remove object" onclick="undo(event)"><i class="fa fa-undo"></i></button>
+	</div>
+	<div class="tool">
+		<button class="tool-button" title="Redo lastest add/remove object" onclick="redo(event)"><i class="fa fa-redo"></i></button>
+	</div>
+	<div class="tool">
+		<button class="tool-button-danger" title="Delete selected" onclick="deleteSelectedObject(event)"><i class="fa fa-trash"></i></button>
+	</div>
+	<div class="tool">
+		<button class="tool-button-danger" title="Clear all annotation" onclick="clearPage()"><i class="fa fa-refresh"></i></button>
+	</div>
+	<div class="tool">
+		<button class="tool-button-info" onclick="showPdfData()">JSON</button>
+	</div>
+	<div class="tool">
+		<button class="tool-button-light" onclick="savePDF()"><i class="fa fa-save"></i> Save</button>
+	</div>
+</div>
+<div class="content">
+	<div id="pdf-container"></div>
+</div>
+
+<div class="modal fade" id="dataModal" tabindex="-1" role="dialog" aria-labelledby="dataModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="dataModalLabel">PDF annotation data</h5>
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+					<span aria-hidden="true">&times;</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<pre class="prettyprint lang-json linenums">
+				</pre>
+			</div>
+		</div>
+	</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.min.js';</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.3.0/fabric.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.2.0/jspdf.umd.min.js"></script>
+
+<script src="./script/jquery.minicolors.js"></script>
+<script src="./sample_output.js"></script>
+<script src="./script/arrow.fabric.js"></script>
+<script src="./script/pdfannotate.js"></script>
+<script src="./script/script.js"></script>
+</body>
+</html>

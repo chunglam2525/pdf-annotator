@@ -1,0 +1,106 @@
+body {
+    background-color: rgb(82, 86, 89);
+}
+
+canvas, .canvas-container {
+    -webkit-box-shadow: 10px 10px 5px 0px rgba(0,0,0,0.75);
+    -moz-box-shadow: 10px 10px 5px 0px rgba(0,0,0,0.75);
+    box-shadow: 10px 10px 5px 0px rgba(0,0,0,0.75);
+}
+
+.toolbar {
+    width: 100%;
+    background-color: rgb(50, 54, 57);
+    height: 50px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    padding: 0 5px;
+}
+
+.content {
+    margin-top: 60px;
+}
+#pdf-container {
+    padding-left: 10px;
+    text-align: center;
+}
+
+button:focus {
+    outline: 0;
+}
+
+.toolbar .tool {
+    display: inline-block;
+    color: #fff;
+    height: 100%;
+    padding: 10px 3px;
+}
+
+.toolbar .tool label,
+.toolbar .tool select,
+.toolbar .tool input {
+    display: inline-block;
+    width: auto;
+    height: auto !important;
+    padding-top: 0;
+    padding-bottom: 0;
+
+}
+
+.toolbar .tool .text-input {
+    width: 75px;
+}
+
+.toolbar .tool:nth-last-child(-n+2) {
+    float: right;
+}
+
+.toolbar .tool .tool-button {
+    width: 30px;
+    border-radius: 0.2rem;
+    background-color: rgb(50, 54, 57);
+    border: 1px solid rgb(50, 54, 57);
+    color: #fff;
+    cursor: pointer;
+}
+.toolbar .tool .tool-button:hover,
+.toolbar .tool .tool-button.active {
+    background-color: rgb(82, 86, 89);
+    border-color: rgb(82, 86, 89);
+}
+
+.toolbar .tool .tool-button-danger {
+    width: 30px;
+    border-radius: 0.2rem;
+    background-color: #dc3545;
+    border: 1px solid rgb(50, 54, 57);
+    color: #fff;
+    cursor: pointer;
+}
+.toolbar .tool .tool-button-danger:hover {
+    background-color: #c82333;
+}
+
+.toolbar .tool .tool-button-info {
+    border-radius: 0.2rem;
+    background-color: #17a2b8;
+    border: 1px solid rgb(50, 54, 57);
+    color: #fff;
+    cursor: pointer;
+}
+.toolbar .tool .tool-button-info:hover {
+    background-color: #117a8b;
+}
+
+.toolbar .tool .tool-button-light {
+    border-radius: 0.2rem;
+    background-color: #f8f9fa;
+    border: 1px solid rgb(50, 54, 57);
+    color: #212529;
+    cursor: pointer;
+}
+.toolbar .tool .tool-button-light:hover {
+    background-color: #e2e6ea;
+}
