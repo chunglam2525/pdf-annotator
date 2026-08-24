@@ -1,111 +1,213 @@
 <!DOCTYPE html>
-<html>
-<head>
-	<title></title>
-	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prettify/r298/prettify.min.css">
-	<link rel="stylesheet" href="./style/jquery.minicolors.css">
-	<link rel="stylesheet" href="./style/pdfannotate.css">
-	<link rel="stylesheet" href="./style/styles.css">
-</head>
-<body>
-<div class="toolbar">
-	<div class="tool">
-		<label for=""><i class="fa fa-magnifying-glass-plus"></i></label>
-		<input class="align-middle" min=".5" max="2" value='1' step=".5" onchange="showVal(this.value)" type="range" />
-	</div>
-	<div class="tool">
-		<button class="tool-button active" title="Free Hand" onclick="enableSelector(event)"><i class="fa fa-hand"></i></button>
-	</div>
-	
-	<div class="tool">
-		<!-- <label for=""><i class="fa-solid fa-droplet"></i></label> -->
-		<input type="text" id="rgba" class="color-picker" data-format="rgb" data-opacity="1" value="rgba(33, 33, 33, 1)">
-	</div>
-	
-	<div class="tool">
-		<button class="tool-button" title="Pencil" onclick="enablePencil(event)"><i class="fa fa-pencil"></i></button>
-		<input type="number" class="form-control text-right text-input" value="1" id="brush-size" max="50">
-	</div>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PDF Annotator</title>
+    <link rel="icon" href="data:," />
+    <meta
+      name="description"
+      content="Annotate PDFs in the browser: draw, text, arrows, rectangles, then export."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <svg xmlns="http://www.w3.org/2000/svg" class="icons" aria-hidden="true">
+      <symbol id="icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 20h16a1 1 0 0 0 1-1V8.5a1 1 0 0 0-1-1h-6.2a1 1 0 0 1-.8-.4l-1.6-2.1a1 1 0 0 0-.8-.4H4a1 1 0 0 0-1 1V19a1 1 0 0 0 1 1z" />
+      </symbol>
+      <symbol id="icon-select" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3v11l3.2-2.1L14 17.5l2.2-1.2-2.7-5.4L17 10.2 8 3z" />
+      </symbol>
+      <symbol id="icon-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 20h4l11.2-11.2a2 2 0 0 0 0-2.8L17 3.8a2 2 0 0 0-2.8 0L3 15v5h1z" />
+        <path d="M13.5 5.5l5 5" />
+      </symbol>
+      <symbol id="icon-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 6h14M12 6v13M8 19h8" />
+      </symbol>
+      <symbol id="icon-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 12h14" />
+        <path d="M14 6l6 6-6 6" />
+      </symbol>
+      <symbol id="icon-rect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="6" width="14" height="12" rx="1.5" />
+      </symbol>
+      <symbol id="icon-highlight" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 18h7l9-9a2.1 2.1 0 0 0 0-3l-2-2a2.1 2.1 0 0 0-3 0l-9 9v5z" />
+        <path d="M12 6l6 6" />
+      </symbol>
+      <symbol id="icon-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="5" width="16" height="14" rx="2" />
+        <circle cx="9" cy="10" r="1.6" />
+        <path d="M4 16l5-4 4 3 3-2 4 3" />
+      </symbol>
+      <symbol id="icon-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 8H4V4" />
+        <path d="M4 8a8 8 0 1 1-1.2 4.5" />
+      </symbol>
+      <symbol id="icon-redo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 8h4V4" />
+        <path d="M20 8a8 8 0 1 0 1.2 4.5" />
+      </symbol>
+      <symbol id="icon-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 8h14M10 4h4m-1 16h4a1 1 0 0 0 1-1V8H6v11a1 1 0 0 0 1 1h2z" />
+      </symbol>
+      <symbol id="icon-clear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 7h16M7 7l1 13h8l1-13M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+      </symbol>
+      <symbol id="icon-json" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 6c-2 0-3 1.5-3 6s1 6 3 6M16 6c2 0 3 1.5 3 6s-1 6-3 6" />
+      </symbol>
+      <symbol id="icon-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4v10" />
+        <path d="M8 10l4 4 4-4" />
+        <path d="M5 18h14" />
+      </symbol>
+      <symbol id="icon-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M6 12h12" />
+      </symbol>
+      <symbol id="icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M12 6v12M6 12h12" />
+      </symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </symbol>
+    </svg>
 
-	<div class="tool">
-		<button class="tool-button" title="Add Text" onclick="enableAddText(event)"><i class="fa fa-font"></i></button>
-		<select id="font-size" class="form-control">
-			<option value="10">10</option>
-			<option value="12">12</option>
-			<option value="16" selected>16</option>
-			<option value="18">18</option>
-			<option value="24">24</option>
-			<option value="32">32</option>
-			<option value="48">48</option>
-			<option value="64">64</option>
-			<option value="72">72</option>
-			<option value="108">108</option>
-		</select>
-	</div>
+    <header class="toolbar">
+      <div class="brand">
+        <strong>PDF Annotator</strong>
+        <span id="doc-meta" class="meta">No document</span>
+      </div>
 
-	<div class="tool">
-		<button class="tool-button" title="Add Arrow" onclick="enableAddArrow(event)"><i class="fa fa-long-arrow-right"></i></button>
-	</div>
-	<div class="tool">
-		<button class="tool-button" title="Add rectangle" onclick="enableRectangle(event)"><i class="fa fa-square"></i></button>
-	</div>
-	<div class="tool">
-		<button class="tool-button" title="Add an Image" onclick="addImage(event)"><i class="fa fa-image"></i></button>
-	</div>
-	<div class="tool">
-		<button class="tool-button" title="Undo lastest add/remove object" onclick="undo(event)"><i class="fa fa-undo"></i></button>
-	</div>
-	<div class="tool">
-		<button class="tool-button" title="Redo lastest add/remove object" onclick="redo(event)"><i class="fa fa-redo"></i></button>
-	</div>
-	<div class="tool">
-		<button class="tool-button-danger" title="Delete selected" onclick="deleteSelectedObject(event)"><i class="fa fa-trash"></i></button>
-	</div>
-	<div class="tool">
-		<button class="tool-button-danger" title="Clear all annotation" onclick="clearPage()"><i class="fa fa-refresh"></i></button>
-	</div>
-	<div class="tool">
-		<button class="tool-button-info" onclick="showPdfData()">JSON</button>
-	</div>
-	<div class="tool">
-		<button class="tool-button-light" onclick="savePDF()"><i class="fa fa-save"></i> Save</button>
-	</div>
-</div>
-<div class="content">
-	<div id="pdf-container"></div>
-</div>
+      <div class="groups">
+        <div class="group" role="group" aria-label="File">
+          <button type="button" class="btn" id="open-btn" title="Open PDF">
+            <svg><use href="#icon-open" /></svg>
+            <span>Open</span>
+          </button>
+          <input id="file-input" type="file" accept="application/pdf,.pdf" hidden />
+        </div>
 
-<div class="modal fade" id="dataModal" tabindex="-1" role="dialog" aria-labelledby="dataModalLabel" aria-hidden="true">
-	<div class="modal-dialog modal-lg" role="document">
-		<div class="modal-content">
-			<div class="modal-header">
-				<h5 class="modal-title" id="dataModalLabel">PDF annotation data</h5>
-				<button type="button" class="close" data-dismiss="modal" aria-label="Close">
-					<span aria-hidden="true">&times;</span>
-				</button>
-			</div>
-			<div class="modal-body">
-				<pre class="prettyprint lang-json linenums">
-				</pre>
-			</div>
-		</div>
-	</div>
-</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+        <div class="group" role="group" aria-label="Zoom">
+          <button type="button" class="icon-btn" id="zoom-out" title="Zoom out" aria-label="Zoom out">
+            <svg><use href="#icon-minus" /></svg>
+          </button>
+          <span id="zoom-label" class="zoom-label">100%</span>
+          <button type="button" class="icon-btn" id="zoom-in" title="Zoom in" aria-label="Zoom in">
+            <svg><use href="#icon-plus" /></svg>
+          </button>
+        </div>
 
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+        <div class="group tools" role="group" aria-label="Tools">
+          <button type="button" class="icon-btn active" data-tool="select" title="Select (Esc)" aria-label="Select">
+            <svg><use href="#icon-select" /></svg>
+          </button>
+          <button type="button" class="icon-btn" data-tool="pencil" title="Pencil" aria-label="Pencil">
+            <svg><use href="#icon-pencil" /></svg>
+          </button>
+          <button type="button" class="icon-btn" data-tool="text" title="Text" aria-label="Text">
+            <svg><use href="#icon-text" /></svg>
+          </button>
+          <button type="button" class="icon-btn" data-tool="highlight" title="Highlight PDF text" aria-label="Highlight PDF text">
+            <svg><use href="#icon-highlight" /></svg>
+          </button>
+          <button type="button" class="icon-btn" data-tool="arrow" title="Arrow" aria-label="Arrow">
+            <svg><use href="#icon-arrow" /></svg>
+          </button>
+          <button type="button" class="icon-btn" data-tool="rect" title="Rectangle" aria-label="Rectangle">
+            <svg><use href="#icon-rect" /></svg>
+          </button>
+          <button type="button" class="icon-btn" id="image-btn" title="Insert image" aria-label="Insert image">
+            <svg><use href="#icon-image" /></svg>
+          </button>
+        </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.min.js"></script>
-<script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.min.js';</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.3.0/fabric.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.2.0/jspdf.umd.min.js"></script>
+        <div class="group style-group" role="group" aria-label="Style">
+          <label class="color-field" title="Color">
+            <input id="color-input" type="color" value="#212121" />
+          </label>
+          <label class="field" title="Opacity">
+            <span>Opacity</span>
+            <input id="opacity-input" type="range" min="0.1" max="1" step="0.1" value="1" />
+          </label>
+          <label class="field" title="Brush size">
+            <span>Brush</span>
+            <input id="brush-input" type="number" min="1" max="50" value="2" />
+          </label>
+          <label class="field" title="Font size">
+            <span>Font</span>
+            <select id="font-input">
+              <option value="10">10</option>
+              <option value="12">12</option>
+              <option value="16" selected>16</option>
+              <option value="18">18</option>
+              <option value="24">24</option>
+              <option value="32">32</option>
+              <option value="48">48</option>
+              <option value="64">64</option>
+              <option value="72">72</option>
+              <option value="108">108</option>
+            </select>
+          </label>
+        </div>
 
-<script src="./script/jquery.minicolors.js"></script>
-<script src="./sample_output.js"></script>
-<script src="./script/arrow.fabric.js"></script>
-<script src="./script/pdfannotate.js"></script>
-<script src="./script/script.js"></script>
-</body>
+        <div class="group" role="group" aria-label="History">
+          <button type="button" class="icon-btn" id="undo-btn" title="Undo (Ctrl+Z)" aria-label="Undo">
+            <svg><use href="#icon-undo" /></svg>
+          </button>
+          <button type="button" class="icon-btn" id="redo-btn" title="Redo (Ctrl+Y)" aria-label="Redo">
+            <svg><use href="#icon-redo" /></svg>
+          </button>
+          <button type="button" class="icon-btn danger" id="delete-btn" title="Delete selected (Delete)" aria-label="Delete selected">
+            <svg><use href="#icon-trash" /></svg>
+          </button>
+          <button type="button" class="icon-btn danger" id="clear-btn" title="Clear page" aria-label="Clear page">
+            <svg><use href="#icon-clear" /></svg>
+          </button>
+        </div>
+
+        <div class="group" role="group" aria-label="Export">
+          <button type="button" class="btn" id="json-btn" title="View annotation JSON">
+            <svg><use href="#icon-json" /></svg>
+            <span>JSON</span>
+          </button>
+          <button type="button" class="btn primary" id="save-btn" title="Save annotated PDF">
+            <svg><use href="#icon-save" /></svg>
+            <span>Save</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="viewer" id="viewer">
+      <div id="empty-state" class="empty">
+        <p>Open a PDF to start annotating, drop a file here.</p>
+        <div class="empty-actions">
+          <button type="button" class="btn primary" id="empty-open">Open PDF</button>
+        </div>
+        <p id="error" class="error" hidden></p>
+      </div>
+      <p id="loading" class="loading" hidden>Loading PDF…</p>
+      <div id="pdf-container" class="pages" hidden></div>
+    </main>
+
+    <dialog id="json-dialog" class="dialog">
+      <div class="dialog-head">
+        <h2>Annotation JSON</h2>
+        <div class="dialog-actions">
+          <button type="button" class="btn" id="copy-json">Copy</button>
+          <button type="button" class="icon-btn" id="close-json" aria-label="Close">
+            <svg><use href="#icon-close" /></svg>
+          </button>
+        </div>
+      </div>
+      <pre id="json-output" class="json-output"></pre>
+    </dialog>
+
+    <script src="lib/fabric.min.js"></script>
+    <script src="lib/jspdf.umd.min.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
 </html>

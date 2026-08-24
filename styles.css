@@ -1,0 +1,380 @@
+:root {
+  color-scheme: dark;
+  --bg: #121417;
+  --viewer: #0e1012;
+  --card: #1b1f24;
+  --border: #2c333c;
+  --text: #e8eaed;
+  --muted: #9aa3ad;
+  --accent: #7dcea0;
+  --accent-text: #102016;
+  --danger: #f2a3a3;
+  --danger-bg: #3a1f22;
+  --error: #f2a3a3;
+  --error-bg: #3a1f22;
+  --focus: #8ab4ff;
+  --page-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  --radius: 10px;
+  --toolbar-h: auto;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f4f6f8;
+    --viewer: #cfd6de;
+    --card: #ffffff;
+    --border: #d7dee6;
+    --text: #1a1f24;
+    --muted: #5b6570;
+    --accent: #1f7a4c;
+    --accent-text: #ffffff;
+    --danger: #9b1c1c;
+    --danger-bg: #fdecec;
+    --error: #9b1c1c;
+    --error-bg: #fdecec;
+    --focus: #1a5fb4;
+    --page-shadow: 0 8px 22px rgba(26, 31, 36, 0.18);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.icons {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--viewer);
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.65rem 0.9rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  min-width: 8rem;
+}
+
+.brand strong {
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.7rem;
+  flex: 1;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding-right: 0.7rem;
+  border-right: 1px solid var(--border);
+}
+
+.group:last-child {
+  border-right: 0;
+  padding-right: 0;
+  margin-left: auto;
+}
+
+.btn,
+.icon-btn,
+.field input,
+.field select {
+  font: inherit;
+}
+
+.btn,
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.icon-btn {
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+}
+
+.btn svg,
+.icon-btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  display: block;
+}
+
+.btn:hover,
+.icon-btn:hover,
+.btn.primary:hover {
+  filter: brightness(1.08);
+}
+
+.icon-btn.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.btn.primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.icon-btn.danger:hover,
+.icon-btn.danger:focus-visible {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.field input:focus-visible,
+.field select:focus-visible,
+.color-field input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.style-group {
+  gap: 0.55rem;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.field input[type="number"],
+.field select {
+  width: 3.6rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.28rem 0.35rem;
+}
+
+.field input[type="range"] {
+  width: 4.2rem;
+  accent-color: var(--accent);
+}
+
+.color-field {
+  display: flex;
+  align-items: center;
+}
+
+.color-field input {
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.zoom-label {
+  min-width: 3.2rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.viewer {
+  min-height: calc(100vh - 4.5rem);
+  padding: 1.25rem 1rem 2.5rem;
+  overflow: auto;
+}
+
+.empty,
+.loading {
+  max-width: 36rem;
+  margin: 12vh auto 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+.empty .btn {
+  margin: 0;
+}
+
+.error {
+  margin: 1rem auto 0;
+  padding: 0.7rem 0.85rem;
+  max-width: 28rem;
+  background: var(--error-bg);
+  color: var(--error);
+  border-radius: 8px;
+}
+
+.pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4rem;
+}
+
+.page-shell {
+  position: relative;
+  box-shadow: var(--page-shadow);
+  background: #fff;
+  overflow: hidden;
+}
+
+.page-shell .canvas-container {
+  box-shadow: none;
+  background: #fff;
+}
+
+.text-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: scale(var(--page-zoom, 1));
+  transform-origin: 0 0;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+  z-index: 2;
+}
+
+.page-shell.text-selectable .text-layer {
+  pointer-events: auto;
+  user-select: text;
+  cursor: text;
+}
+
+.text-layer span {
+  position: absolute;
+  white-space: pre;
+  color: transparent;
+  transform-origin: 0 0;
+}
+
+.text-layer ::selection {
+  background: rgba(80, 140, 255, 0.35);
+}
+
+.viewer.dragover {
+  outline: 2px dashed var(--accent);
+  outline-offset: -8px;
+}
+
+.dialog {
+  width: min(720px, calc(100vw - 2rem));
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.dialog-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.json-output {
+  margin: 0;
+  max-height: min(65vh, 32rem);
+  overflow: auto;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font: 0.82rem/1.45 ui-monospace, "Cascadia Code", Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .group {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  .group:last-child {
+    margin-left: 0;
+  }
+
+  .brand strong {
+    display: none;
+  }
+}
