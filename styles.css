@@ -15,7 +15,6 @@
   --focus: #8ab4ff;
   --page-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
   --radius: 10px;
-  --toolbar-h: auto;
   font-family: "Segoe UI", system-ui, sans-serif;
 }
 
@@ -269,7 +268,65 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.4rem;
+  gap: 0.35rem;
+}
+
+.page-insert {
+  display: flex;
+  justify-content: center;
+  width: min(100%, 36rem);
+}
+
+.page-insert-btn {
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.page-insert-btn:hover,
+.page-insert-btn:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.page-insert-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.page-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-block: 0.45rem;
+}
+
+.page-remove-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--danger);
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.page-remove-btn:hover,
+.page-remove-btn:focus-visible {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+
+.page-remove-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .page-shell {
@@ -351,17 +408,35 @@ body {
   gap: 0.4rem;
 }
 
+.json-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .json-output {
-  margin: 0;
+  display: block;
+  width: 100%;
+  min-height: min(50vh, 22rem);
   max-height: min(65vh, 32rem);
+  margin: 0;
   overflow: auto;
   padding: 0.8rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg);
+  color: var(--text);
   font: 0.82rem/1.45 ui-monospace, "Cascadia Code", Consolas, monospace;
-  white-space: pre-wrap;
+  white-space: pre;
   word-break: break-word;
+  resize: vertical;
+}
+
+.json-error {
+  margin: 0.65rem 0 0;
+  color: var(--error);
+  font-size: 0.8rem;
 }
 
 @media (max-width: 900px) {

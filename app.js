@@ -1,5 +1,8 @@
-import { PdfAnnotator } from './annotator.js';
+// Classic script (not a module) so this file loads from file:// without a server.
+(function () {
+'use strict';
 
+const PdfAnnotator = window.PdfAnnotator;
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 const viewer = document.getElementById('viewer');
@@ -12,6 +15,7 @@ const zoomLabel = document.getElementById('zoom-label');
 const fileInput = document.getElementById('file-input');
 const jsonDialog = document.getElementById('json-dialog');
 const jsonOutput = document.getElementById('json-output');
+const jsonError = document.getElementById('json-error');
 const colorInput = document.getElementById('color-input');
 const opacityInput = document.getElementById('opacity-input');
 const brushInput = document.getElementById('brush-input');
@@ -22,6 +26,7 @@ const annotator = new PdfAnnotator(container, {
   onReady: updateChrome,
   onToolChange: (tool) => setActiveToolButton(tool),
   onHistoryChange: updateChrome,
+  onPagesChange: updateChrome,
 });
 
 function hexToRgba(hex, opacity) {
@@ -131,15 +136,112 @@ function isTypingTarget(target) {
   return Boolean(target.closest('input, select, textarea, [contenteditable="true"]'));
 }
 
+function showDocument() {
+  emptyState.hidden = true;
+  container.hidden = false;
+}
+
+function hasAnnotations() {
+  return annotator.serialize().pages.some((page) => page.objects?.length);
+}
+
+function showJsonError(message) {
+  jsonError.hidden = !message;
+  jsonError.textContent = message || '';
+}
+
+function openJsonDialog(text = JSON.stringify(annotator.serialize(), null, 2)) {
+  jsonOutput.value = text;
+  showJsonError('');
+  jsonDialog.showModal();
+}
+
+async function applyJson() {
+  showJsonError('');
+  try {
+    annotator.validateAnnotations(jsonOutput.value);
+  } catch (error) {
+    showJsonError(error.message);
+    return false;
+  }
+
+  if (hasAnnotations() && !window.confirm('Replace all annotations with this JSON?')) {
+    return false;
+  }
+
+  try {
+    await annotator.importAnnotations(jsonOutput.value);
+    jsonDialog.close();
+    updateChrome();
+    return true;
+  } catch (error) {
+    showJsonError(error.message);
+    return false;
+  }
+}
+
+function showEmptyState() {
+  emptyState.hidden = false;
+  container.hidden = true;
+}
+
+async function removeBlankPage(index) {
+  showError('');
+  if (!annotator.isBlankPage(index)) {
+    showError('Only added blank pages can be removed.');
+    return;
+  }
+  if (!window.confirm('Remove this blank page?')) {
+    return;
+  }
+  try {
+    annotator.removeBlankPage(index);
+    if (annotator.isReady) {
+      showDocument();
+    } else {
+      showEmptyState();
+    }
+  } catch (error) {
+    console.error(error);
+    showError(error.message || 'Could not remove that blank page.');
+  } finally {
+    updateChrome();
+  }
+}
+
+async function addBlankPage(index) {
+  showError('');
+  try {
+    await annotator.addBlankPage(index);
+    annotator.setColor(currentColor());
+    annotator.setBrushSize(brushInput.value);
+    annotator.setFontSize(fontInput.value);
+    setActiveToolButton(annotator.tool);
+    showDocument();
+  } catch (error) {
+    console.error(error);
+    showError(error.message || 'Could not add a blank page.');
+    emptyState.hidden = annotator.isReady;
+  } finally {
+    updateChrome();
+  }
+}
+
 document.getElementById('open-btn').addEventListener('click', openFilePicker);
 document.getElementById('empty-open').addEventListener('click', openFilePicker);
+document.getElementById('empty-blank').addEventListener('click', () => addBlankPage(0));
 document.getElementById('zoom-out').addEventListener('click', () => changeZoom(-1));
 document.getElementById('zoom-in').addEventListener('click', () => changeZoom(1));
 document.getElementById('image-btn').addEventListener('click', () => annotator.addImage());
 document.getElementById('undo-btn').addEventListener('click', () => annotator.undo());
 document.getElementById('redo-btn').addEventListener('click', () => annotator.redo());
 document.getElementById('delete-btn').addEventListener('click', () => annotator.deleteSelected());
-document.getElementById('save-btn').addEventListener('click', () => annotator.savePdf());
+document.getElementById('save-btn').addEventListener('click', () => {
+  annotator.savePdf().catch((error) => {
+    console.error(error);
+    showError(error.message || 'Could not save that PDF.');
+  });
+});
 
 document.getElementById('clear-btn').addEventListener('click', () => {
   if (window.confirm('Clear all annotations on this page?')) {
@@ -148,17 +250,30 @@ document.getElementById('clear-btn').addEventListener('click', () => {
 });
 
 document.getElementById('json-btn').addEventListener('click', () => {
-  jsonOutput.textContent = JSON.stringify(annotator.serialize(), null, 2);
-  jsonDialog.showModal();
+  openJsonDialog();
 });
 
+document.getElementById('apply-json').addEventListener('click', () => applyJson());
 document.getElementById('close-json').addEventListener('click', () => jsonDialog.close());
 document.getElementById('copy-json').addEventListener('click', async () => {
-  await navigator.clipboard.writeText(jsonOutput.textContent);
+  await navigator.clipboard.writeText(jsonOutput.value);
   document.getElementById('copy-json').textContent = 'Copied';
   window.setTimeout(() => {
     document.getElementById('copy-json').textContent = 'Copy';
   }, 1200);
+});
+
+container.addEventListener('click', (event) => {
+  const remove = event.target.closest('[data-remove-at]');
+  if (remove) {
+    removeBlankPage(Number(remove.dataset.removeAt));
+    return;
+  }
+  const button = event.target.closest('[data-insert-at]');
+  if (!button || !annotator.isReady) {
+    return;
+  }
+  addBlankPage(Number(button.dataset.insertAt));
 });
 
 fileInput.addEventListener('change', () => {
@@ -202,7 +317,7 @@ viewer.addEventListener('drop', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (isTypingTarget(event.target) || annotator.isEditingText()) {
+  if (jsonDialog.open || isTypingTarget(event.target) || annotator.isEditingText()) {
     return;
   }
 
@@ -234,3 +349,4 @@ document.addEventListener('keydown', (event) => {
 });
 
 updateChrome();
+})();

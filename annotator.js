@@ -1,6 +1,12 @@
-import * as pdfjsLib from './lib/pdf.min.mjs';
+// Classic script (not a module) so this file loads from file:// without a server.
+(function () {
+'use strict';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./lib/pdf.worker.min.mjs', import.meta.url).href;
+const pdfjsLib = window.pdfjsLib;
+const parseAnnotationJson = window.parseAnnotationJson;
+const validateAnnotationData = window.validateAnnotationData;
+
+const DEFAULT_PAGE_SIZE = { width: 612, height: 792 };
 
 function getFabric() {
   const fabric = window.fabric;
@@ -82,6 +88,75 @@ function newId() {
   return crypto.randomUUID();
 }
 
+function getPdfLib() {
+  const lib = window.PDFLib;
+  if (!lib?.PDFDocument) {
+    throw new Error('pdf-lib failed to load');
+  }
+  return lib;
+}
+
+function dataUrlToBytes(dataUrl) {
+  const comma = dataUrl.indexOf(',');
+  const binary = atob(comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function downloadBytes(bytes, fileName, type) {
+  const blob = new Blob([bytes], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function stampOverlay(page, image, viewWidth, viewHeight, degrees) {
+  const angle = (((page.getRotation().angle % 360) + 360) % 360);
+  const { width, height } = page.getSize();
+  if (angle === 90) {
+    page.drawImage(image, {
+      x: width,
+      y: 0,
+      width: viewWidth,
+      height: viewHeight,
+      rotate: degrees(90),
+    });
+    return;
+  }
+  if (angle === 180) {
+    page.drawImage(image, {
+      x: width,
+      y: height,
+      width: viewWidth,
+      height: viewHeight,
+      rotate: degrees(180),
+    });
+    return;
+  }
+  if (angle === 270) {
+    page.drawImage(image, {
+      x: 0,
+      y: height,
+      width: viewWidth,
+      height: viewHeight,
+      rotate: degrees(270),
+    });
+    return;
+  }
+  page.drawImage(image, {
+    x: 0,
+    y: 0,
+    width: viewWidth,
+    height: viewHeight,
+  });
+}
+
 function toObjectJson(object) {
   return object.toObject(['uuid']);
 }
@@ -141,7 +216,7 @@ async function enliven(json) {
   return object;
 }
 
-export class PdfAnnotator {
+class PdfAnnotator {
   constructor(container, options = {}) {
     this.container = typeof container === 'string' ? document.getElementById(container) : container;
     this.options = options;
@@ -152,8 +227,8 @@ export class PdfAnnotator {
     this.fontSize = options.fontSize || 16;
     this.tool = 'select';
     this.source = null;
+    this.sourceBytes = null;
     this.fileName = '';
-    this.pageCount = 0;
     this.activePage = 0;
     this.format = null;
     this.orientation = 'portrait';
@@ -161,6 +236,8 @@ export class PdfAnnotator {
     this.pageImages = [];
     this.pageSizes = [];
     this.pageShells = [];
+    this.pageHosts = [];
+    this.pageBlank = [];
     this.history = [];
     this.historyIndex = -1;
     this.ignoreHistory = false;
@@ -176,6 +253,10 @@ export class PdfAnnotator {
     return this.canvases.length > 0;
   }
 
+  get pageCount() {
+    return this.canvases.length;
+  }
+
   get canUndo() {
     return this.historyIndex >= 0;
   }
@@ -185,7 +266,7 @@ export class PdfAnnotator {
   }
 
   async load(source, annotations = null, { preserveHistory = false } = {}) {
-    const fabric = getFabric();
+    getFabric();
     this.disposeCanvases();
     if (!preserveHistory) {
       this.resetHistory();
@@ -193,10 +274,11 @@ export class PdfAnnotator {
 
     this.source = await this.normalizeSource(source);
     this.fileName = this.nameFromSource(source);
+    this.sourceBytes = await this.bytesFromSource(this.source);
+    this.source = { data: this.sourceBytes.slice() };
     this.activePage = 0;
 
     const pdf = await pdfjsLib.getDocument(this.source).promise;
-    this.pageCount = pdf.numPages;
 
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber);
@@ -208,7 +290,6 @@ export class PdfAnnotator {
 
       const renderViewport = page.getViewport({ scale: this.renderScale });
       const element = document.createElement('canvas');
-      element.id = `page-${pageNumber}`;
       element.width = renderViewport.width;
       element.height = renderViewport.height;
       const context = element.getContext('2d');
@@ -219,43 +300,24 @@ export class PdfAnnotator {
       });
       await (renderTask.promise ?? renderTask);
 
-      const shell = document.createElement('div');
-      shell.className = 'page-shell';
-      shell.dataset.pageIndex = String(pageNumber - 1);
-      this.layoutShell(shell, unscaled.width, unscaled.height);
-      shell.appendChild(element);
-      this.container.appendChild(shell);
-
-      this.pageImages.push(element.toDataURL('image/png'));
-      this.pageSizes.push({ width: unscaled.width, height: unscaled.height });
-      this.pageShells.push(shell);
-
-      const canvas = new fabric.Canvas(element, {
-        selection: this.tool === 'select',
-        preserveObjectStacking: true,
-      });
-      canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-      canvas.freeDrawingBrush.color = this.color;
-      canvas.freeDrawingBrush.width = this.brushSize;
-      canvas.setDimensions({
-        width: unscaled.width * this.scale,
-        height: unscaled.height * this.scale,
-      });
-      canvas.setZoom(this.scale);
-      await this.applyBackground(canvas, pageNumber - 1);
-      this.bindCanvas(canvas, pageNumber - 1);
-      this.canvases.push(canvas);
-
-      const textLayer = document.createElement('div');
-      textLayer.className = 'text-layer';
-      shell.appendChild(textLayer);
-      await fillTextLayer(page, textLayer, page.getViewport({ scale: 1 }));
+      await this.mountPage(
+        {
+          width: unscaled.width,
+          height: unscaled.height,
+          pageImage: element.toDataURL('image/png'),
+          atIndex: pageNumber - 1,
+          element,
+          fillText: (textLayer) => fillTextLayer(page, textLayer, page.getViewport({ scale: 1 })),
+        },
+        { syncSlots: false }
+      );
     }
 
+    this.syncInsertSlots();
     this.setTool(this.tool, { keepSelection: true, silent: true });
 
     if (annotations) {
-      await this.loadAnnotations(annotations);
+      await this.importAnnotations(annotations, { resetHistory: false });
     }
 
     this.options.onReady?.();
@@ -429,6 +491,90 @@ export class PdfAnnotator {
     input.click();
   }
 
+  async addBlankPage(index = this.pageCount) {
+    if (!this.container) {
+      throw new Error('Annotator container is missing.');
+    }
+
+    const atIndex = Math.trunc(Number(index));
+    if (!Number.isFinite(atIndex) || atIndex < 0 || atIndex > this.pageCount) {
+      throw new Error(`Page index must be between 0 and ${this.pageCount}.`);
+    }
+
+    if (!this.format) {
+      this.format = [DEFAULT_PAGE_SIZE.width, DEFAULT_PAGE_SIZE.height];
+      this.orientation = 'portrait';
+      this.fileName = this.fileName || 'untitled.pdf';
+    }
+
+    const neighbor = this.pageSizes[Math.min(atIndex, this.pageSizes.length - 1)] || {
+      width: this.format[0],
+      height: this.format[1],
+    };
+    const width = neighbor.width;
+    const height = neighbor.height;
+
+    await this.mountPage({
+      width,
+      height,
+      pageImage: this.createBlankPageImage(width, height),
+      atIndex,
+      blank: true,
+    });
+
+    this.activePage = atIndex;
+    this.shiftHistoryPageIndices(atIndex, 1);
+    this.pageHosts[atIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    this.options.onPagesChange?.();
+    return atIndex;
+  }
+
+  isBlankPage(index) {
+    return Boolean(this.pageBlank[index]);
+  }
+
+  removeBlankPage(index) {
+    const atIndex = Math.trunc(Number(index));
+    if (!Number.isFinite(atIndex) || atIndex < 0 || atIndex >= this.pageCount) {
+      throw new Error('That page does not exist.');
+    }
+    if (!this.isBlankPage(atIndex)) {
+      throw new Error('Only added blank pages can be removed.');
+    }
+
+    this.cancelDraft();
+    const canvas = this.canvases[atIndex];
+    const host = this.pageHosts[atIndex];
+    canvas?.dispose();
+    host?.remove();
+
+    this.canvases.splice(atIndex, 1);
+    this.pageImages.splice(atIndex, 1);
+    this.pageSizes.splice(atIndex, 1);
+    this.pageShells.splice(atIndex, 1);
+    this.pageHosts.splice(atIndex, 1);
+    this.pageBlank.splice(atIndex, 1);
+    this.resetHistory();
+
+    if (this.pageCount === 0) {
+      this.container.replaceChildren();
+      this.format = null;
+      this.orientation = 'portrait';
+      this.fileName = '';
+      this.source = null;
+      this.sourceBytes = null;
+      this.activePage = 0;
+    } else {
+      this.activePage = Math.min(atIndex, this.pageCount - 1);
+      this.reindexPages();
+      this.syncInsertSlots();
+      this.setTool(this.tool, { keepSelection: true, silent: true });
+    }
+
+    this.options.onPagesChange?.();
+    return atIndex;
+  }
+
   serialize() {
     return {
       page_setup: {
@@ -442,6 +588,25 @@ export class PdfAnnotator {
         return json;
       }),
     };
+  }
+
+  validateAnnotations(input) {
+    return validateAnnotationData(parseAnnotationJson(input), {
+      pageCount: this.isReady ? this.pageCount : undefined,
+    });
+  }
+
+  async importAnnotations(input, { resetHistory = true } = {}) {
+    if (!this.isReady) {
+      throw new Error('Open a PDF or add a blank page before importing annotations.');
+    }
+    const valid = this.validateAnnotations(input);
+    await this.loadAnnotations(valid);
+    if (resetHistory) {
+      this.resetHistory();
+    }
+    this.options.onHistoryChange?.();
+    return valid;
   }
 
   async loadAnnotations(data) {
@@ -462,41 +627,68 @@ export class PdfAnnotator {
     this.ignoreHistory = false;
   }
 
-  savePdf(fileName = this.fileName || 'annotated.pdf') {
+  async savePdf(fileName = this.fileName || 'annotated.pdf') {
     if (!this.canvases.length || !this.format) {
       return;
     }
-    const jsPDF = window.jspdf?.jsPDF;
-    if (!jsPDF) {
-      throw new Error('jsPDF failed to load');
+
+    const { PDFDocument, degrees } = getPdfLib();
+    const exportName = fileName.toLowerCase().endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+    const sourceDoc = this.sourceBytes
+      ? await PDFDocument.load(this.sourceBytes, { ignoreEncryption: true })
+      : null;
+    const outDoc = await PDFDocument.create();
+
+    if (sourceDoc) {
+      const title = sourceDoc.getTitle();
+      if (title) {
+        outDoc.setTitle(title);
+      }
     }
 
-    const [width, height] = this.format;
-    const orientation = this.orientation;
-    const doc = new jsPDF({ unit: 'pt', format: [width, height], orientation });
-    const exportName = fileName.toLowerCase().endsWith('.pdf') ? fileName : `${fileName}.pdf`;
-
-    this.canvases.forEach((canvas, index) => {
-      if (index > 0) {
-        doc.addPage([width, height], orientation);
+    let sourceIndex = 0;
+    for (let index = 0; index < this.pageCount; index += 1) {
+      const { width, height } = this.pageSizes[index];
+      let page;
+      if (this.pageBlank[index] || !sourceDoc) {
+        page = outDoc.addPage([width, height]);
+      } else {
+        const [copied] = await outDoc.copyPages(sourceDoc, [sourceIndex]);
+        page = outDoc.addPage(copied);
+        sourceIndex += 1;
       }
-      doc.addImage(
-        canvas.toDataURL({
-          format: 'jpeg',
-          quality: 0.92,
-          multiplier: this.renderScale / this.scale,
-        }),
-        'JPEG',
-        0,
-        0,
-        width,
-        height,
-        `page-${index + 1}`,
-        'MEDIUM'
-      );
-    });
 
-    doc.save(exportName);
+      const overlay = this.annotationPng(index);
+      if (overlay) {
+        const image = await outDoc.embedPng(dataUrlToBytes(overlay));
+        stampOverlay(page, image, width, height, degrees);
+      }
+    }
+
+    const bytes = await outDoc.save();
+    downloadBytes(bytes, exportName, 'application/pdf');
+  }
+
+  annotationPng(index) {
+    const canvas = this.canvases[index];
+    if (!canvas || canvas.getObjects().length === 0) {
+      return null;
+    }
+
+    const backgroundImage = canvas.backgroundImage;
+    const backgroundColor = canvas.backgroundColor;
+    canvas.backgroundImage = null;
+    canvas.backgroundColor = '';
+    canvas.renderAll();
+    const dataUrl = canvas.toDataURL({
+      format: 'png',
+      multiplier: this.renderScale / this.scale,
+      enableRetinaScaling: false,
+    });
+    canvas.backgroundImage = backgroundImage;
+    canvas.backgroundColor = backgroundColor;
+    canvas.requestRenderAll();
+    return dataUrl;
   }
 
   isEditingText() {
@@ -515,8 +707,28 @@ export class PdfAnnotator {
     this.pageImages = [];
     this.pageSizes = [];
     this.pageShells = [];
+    this.pageHosts = [];
+    this.pageBlank = [];
     this.draft = null;
     this.container.replaceChildren();
+  }
+
+  async bytesFromSource(source) {
+    if (source?.data instanceof Uint8Array) {
+      return source.data.slice();
+    }
+    if (source?.data instanceof ArrayBuffer) {
+      return new Uint8Array(source.data.slice(0));
+    }
+    if (source?.url || typeof source === 'string') {
+      const url = source.url || source;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Could not read the original PDF for saving.');
+      }
+      return new Uint8Array(await response.arrayBuffer());
+    }
+    throw new Error('Unsupported PDF source');
   }
 
   async normalizeSource(source) {
@@ -553,6 +765,146 @@ export class PdfAnnotator {
     shell.style.width = `${pageWidth * this.scale}px`;
     shell.style.height = `${pageHeight * this.scale}px`;
     shell.style.setProperty('--page-zoom', String(this.scale));
+  }
+
+  createBlankPageImage(width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(width * this.renderScale));
+    canvas.height = Math.max(1, Math.round(height * this.renderScale));
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
+  }
+
+  async mountPage({ width, height, pageImage, atIndex, element, fillText, blank = false }, { syncSlots = true } = {}) {
+    const fabric = getFabric();
+    const canvasEl = element || document.createElement('canvas');
+    if (!element) {
+      canvasEl.width = Math.max(1, Math.round(width * this.renderScale));
+      canvasEl.height = Math.max(1, Math.round(height * this.renderScale));
+    }
+
+    const shell = document.createElement('div');
+    shell.className = 'page-shell';
+    this.layoutShell(shell, width, height);
+    shell.appendChild(canvasEl);
+
+    const host = document.createElement('div');
+    host.className = 'page-block';
+    if (blank) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'page-remove-btn';
+      remove.dataset.removeAt = String(atIndex);
+      remove.textContent = 'Remove blank page';
+      remove.title = 'Remove this added blank page';
+      host.appendChild(remove);
+    }
+    host.appendChild(shell);
+
+    const nextHost = this.pageHosts[atIndex];
+    if (nextHost) {
+      this.container.insertBefore(host, nextHost);
+    } else {
+      this.container.appendChild(host);
+    }
+
+    this.pageImages.splice(atIndex, 0, pageImage);
+    this.pageSizes.splice(atIndex, 0, { width, height });
+    this.pageShells.splice(atIndex, 0, shell);
+    this.pageHosts.splice(atIndex, 0, host);
+    this.pageBlank.splice(atIndex, 0, Boolean(blank));
+
+    const canvas = new fabric.Canvas(canvasEl, {
+      selection: this.tool === 'select',
+      preserveObjectStacking: true,
+    });
+    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+    canvas.freeDrawingBrush.color = this.color;
+    canvas.freeDrawingBrush.width = this.brushSize;
+    canvas.setDimensions({
+      width: width * this.scale,
+      height: height * this.scale,
+    });
+    canvas.setZoom(this.scale);
+    this.canvases.splice(atIndex, 0, canvas);
+    await this.applyBackground(canvas, atIndex);
+    this.bindCanvas(canvas);
+
+    const textLayer = document.createElement('div');
+    textLayer.className = 'text-layer';
+    textLayer.style.width = `${width}px`;
+    textLayer.style.height = `${height}px`;
+    shell.appendChild(textLayer);
+    if (fillText) {
+      await fillText(textLayer);
+    }
+
+    this.reindexPages();
+    if (syncSlots) {
+      this.syncInsertSlots();
+      this.setTool(this.tool, { keepSelection: true, silent: true });
+    }
+  }
+
+  reindexPages() {
+    this.pageShells.forEach((shell, index) => {
+      shell.dataset.pageIndex = String(index);
+      const canvas = shell.querySelector('canvas');
+      if (canvas) {
+        canvas.id = `page-${index + 1}`;
+      }
+      const remove = this.pageHosts[index]?.querySelector('[data-remove-at]');
+      if (remove) {
+        remove.dataset.removeAt = String(index);
+      }
+    });
+  }
+
+  syncInsertSlots() {
+    for (const slot of this.container.querySelectorAll('.page-insert')) {
+      slot.remove();
+    }
+
+    const count = this.pageShells.length;
+    for (let index = 0; index <= count; index += 1) {
+      const slot = document.createElement('div');
+      slot.className = 'page-insert';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'page-insert-btn';
+      button.dataset.insertAt = String(index);
+      if (index === 0) {
+        button.textContent = 'Add blank page at start';
+        button.title = 'Insert a blank page before page 1';
+      } else if (index === count) {
+        button.textContent = 'Add blank page at end';
+        button.title = `Insert a blank page after page ${count}`;
+      } else {
+        button.textContent = `Add blank page after ${index}`;
+        button.title = `Insert a blank page between page ${index} and page ${index + 1}`;
+      }
+      slot.appendChild(button);
+      const before = this.pageHosts[index];
+      if (before) {
+        this.container.insertBefore(slot, before);
+      } else {
+        this.container.appendChild(slot);
+      }
+    }
+  }
+
+  indexOfCanvas(canvas) {
+    return this.canvases.indexOf(canvas);
+  }
+
+  shiftHistoryPageIndices(fromIndex, delta) {
+    for (const entry of this.history) {
+      if (entry.pageIndex >= fromIndex) {
+        entry.pageIndex += delta;
+      }
+    }
   }
 
   highlightColor() {
@@ -642,15 +994,34 @@ export class PdfAnnotator {
     canvas.requestRenderAll();
   }
 
-  bindCanvas(canvas, pageIndex) {
+  bindCanvas(canvas) {
     canvas.on('mouse:down', (event) => {
+      const pageIndex = this.indexOfCanvas(canvas);
+      if (pageIndex < 0) {
+        return;
+      }
       this.activePage = pageIndex;
       this.onMouseDown(canvas, pageIndex, event);
     });
     canvas.on('mouse:move', (event) => this.onMouseMove(canvas, event));
-    canvas.on('mouse:up', () => this.onMouseUp(canvas, pageIndex));
-    canvas.on('object:added', (event) => this.recordAdd(pageIndex, event.target));
-    canvas.on('object:removed', (event) => this.recordRemove(pageIndex, event.target));
+    canvas.on('mouse:up', () => {
+      const pageIndex = this.indexOfCanvas(canvas);
+      if (pageIndex >= 0) {
+        this.onMouseUp(canvas, pageIndex);
+      }
+    });
+    canvas.on('object:added', (event) => {
+      const pageIndex = this.indexOfCanvas(canvas);
+      if (pageIndex >= 0) {
+        this.recordAdd(pageIndex, event.target);
+      }
+    });
+    canvas.on('object:removed', (event) => {
+      const pageIndex = this.indexOfCanvas(canvas);
+      if (pageIndex >= 0) {
+        this.recordRemove(pageIndex, event.target);
+      }
+    });
   }
 
   onMouseDown(canvas, pageIndex, event) {
@@ -891,3 +1262,6 @@ export class PdfAnnotator {
     }
   }
 }
+
+window.PdfAnnotator = PdfAnnotator;
+})();

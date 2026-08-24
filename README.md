@@ -1,6 +1,8 @@
 # PDF Annotator
 
-Browser app for annotating PDFs: open a file, draw or highlight on the pages, then save a flattened PDF. The UI is plain HTML/CSS/JS. There is no build step and no jQuery.
+Browser app for annotating PDFs: open a file, draw or highlight on the pages, then save. The UI is plain HTML/CSS/JS. There is no build step, no bundler, and no jQuery.
+
+Open `index.html` in a browser. A local HTTP server is not required.
 
 ![Screenshot](./Screenshot.png?raw=true "Screenshot")
 
@@ -9,41 +11,41 @@ Inspired by [RavishaHesh/PDFJsAnnotations](https://github.com/RavishaHesh/PDFJsA
 ## Features
 
 - Open a PDF from the file picker or by dropping it on the viewer
+- Start from a blank page if you have no PDF
 - Tools: select, pencil, text, highlight PDF text, arrow, rectangle, insert image
 - Color, opacity, brush size, and font size
 - Zoom, undo/redo, delete selected, clear the current page
-- Inspect annotation JSON, then save a flattened PDF
+- Insert or remove blank pages from the buttons between pages
+- Edit annotation JSON in the dialog, then Apply (validated first)
+- Save keeps the original PDF text and stamps annotations on top
+
+## Run
+
+Double-click `index.html`, or open that file from the browser. Scripts are classic `<script>` tags (not ES modules), so `file://` works in Chrome, Edge, and Firefox.
+
+Hard-refresh (`Ctrl+F5`) after you replace files in `lib/`.
 
 ## Libraries
 
-Vendored copies live in `lib/`. Script tags in `index.html` load Fabric and jsPDF; `annotator.js` imports PDF.js as an ES module.
+Vendored copies live in `lib/`. `index.html` loads them in this order: Fabric, pdf-lib, the PDF.js worker, PDF.js, then the app scripts.
 
 | Library | File | Role |
 | --- | --- | --- |
-| [PDF.js](https://mozilla.github.io/pdf.js/) 6.2.108 | `lib/pdf.min.mjs` + `lib/pdf.worker.min.mjs` | Parse the PDF, rasterize each page, and extract text for the highlight tool |
+| [PDF.js](https://mozilla.github.io/pdf.js/) 6.2.108 | `lib/pdf.min.js` + `lib/pdf.worker.min.js` | Parse the PDF, rasterize each page, and extract text for the highlight tool. The worker runs on the main thread so `file://` does not need a Web Worker. |
 | [Fabric.js](https://fabricjs.com/) 7.4.0 | `lib/fabric.min.js` | Interactive canvas on each page: draw, move, resize, and serialize objects |
-| [jsPDF](https://github.com/parallax/jsPDF) 4.2.1 | `lib/jspdf.umd.min.js` | Flatten each annotated canvas into a downloadable PDF |
+| [pdf-lib](https://github.com/Hopding/pdf-lib) 1.17.1 | `lib/pdf-lib.min.js` | Write the saved PDF: copy original pages (text stays selectable) and overlay annotations |
 
-To upgrade a library, replace the matching file in `lib/` and keep the same filenames, or update the `<script>` / `import` paths in `index.html` and `annotator.js`.
-
-## Run locally
-
-ES modules cannot load from `file://`. Serve the project folder, then open the URL in a browser:
-
-```bash
-npx serve .
-```
-
-Or any other static server (`python -m http.server`, VS Code Live Server, and so on).
+To upgrade a library, replace the matching file in `lib/` and keep the same filenames. PDF.js must stay a classic script (not `.mjs`), and both the main file and worker should stay wrapped so they do not leak globals into the page.
 
 ## Project layout
 
 | File | What to edit |
 | --- | --- |
-| `index.html` | Toolbar markup, tool buttons, style controls, empty state, JSON dialog |
+| `index.html` | Toolbar markup, tool buttons, style controls, empty state, JSON dialog, script tags |
 | `styles.css` | Layout and theme. Colors are CSS variables on `:root` |
 | `app.js` | Wires the UI to `PdfAnnotator`: file open, zoom, keyboard shortcuts, dialogs |
-| `annotator.js` | Core engine: load pages, tools, history, serialize, export |
+| `annotator.js` | Core engine: load pages, tools, history, blank pages, serialize, export |
+| `annotation-json.js` | Parse and validate annotation JSON before import |
 | `lib/` | Third-party libraries (usually leave these alone) |
 
 `app.js` creates one `PdfAnnotator` and passes callbacks so the toolbar can stay in sync:
@@ -54,10 +56,11 @@ const annotator = new PdfAnnotator(container, {
   onReady: updateChrome,
   onToolChange: (tool) => setActiveToolButton(tool),
   onHistoryChange: updateChrome,
+  onPagesChange: updateChrome,
 });
 ```
 
-Public methods you will call from UI code: `load`, `setTool`, `setColor`, `setBrushSize`, `setFontSize`, `setZoom`, `addImage`, `undo`, `redo`, `deleteSelected`, `clearPage`, `serialize`, `loadAnnotations`, `savePdf`.
+Useful methods from UI code: `load`, `setTool`, `setColor`, `setBrushSize`, `setFontSize`, `setZoom`, `addImage`, `addBlankPage`, `removeBlankPage`, `undo`, `redo`, `deleteSelected`, `clearPage`, `serialize`, `validateAnnotations`, `importAnnotations`, `savePdf`.
 
 ## Change the UI
 
@@ -69,9 +72,11 @@ To add a toolbar button:
 
 1. Add the button in `index.html` (copy an existing `.icon-btn` or `.btn`).
 2. In `app.js`, attach a click handler that calls the matching `annotator` method.
-3. If the control should disable until a PDF is open, add its id to the list in `updateChrome()`.
+3. If the control should disable until a document is open, add its id to the list in `updateChrome()`.
 
 Zoom steps are the `ZOOM_STEPS` array at the top of `app.js`. Keyboard shortcuts (Esc, Delete, Ctrl/Cmd+Z, Ctrl/Cmd+Y) are in the `keydown` listener in the same file.
+
+Blank-page insert and remove controls are created in `annotator.js` (`syncInsertSlots` and the remove button on added pages), not in the toolbar.
 
 ## Add or change tools
 
@@ -95,9 +100,11 @@ Color and size changes go through `setColor`, `setBrushSize`, and `setFontSize`.
 
 ## Load, save, and reuse annotations
 
-`serialize()` returns page objects without the PDF background image. `load(source, annotations)` can reopen a PDF and restore that JSON. `savePdf()` rasterizes each Fabric canvas through jsPDF, so the download is a flattened image PDF, not an editable annotation layer.
+`serialize()` returns page objects without the PDF background image. Open **JSON**, edit the text, then **Apply**. `validateAnnotations()` runs first and rejects invalid JSON or a page count that does not match the open document.
 
-Change export quality in `savePdf()` (`quality`, `multiplier`, JPEG vs PNG). Change on-screen sharpness with the `renderScale` constructor option in `annotator.js`.
+`savePdf()` copies original PDF pages with [pdf-lib](https://github.com/Hopding/pdf-lib) so existing text stays selectable, then stamps a transparent PNG of the Fabric annotations on top. Blank pages you added are written as new pages. Annotation drawings themselves are raster, not native PDF annotation objects.
+
+On-screen sharpness is the `renderScale` constructor option in `annotator.js`. Overlay export uses the same scale.
 
 ## License
 

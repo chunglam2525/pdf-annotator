@@ -7,7 +7,7 @@
     <link rel="icon" href="data:," />
     <meta
       name="description"
-      content="Annotate PDFs in the browser: draw, text, arrows, rectangles, then export."
+      content="Annotate PDFs in the browser: draw, highlight, insert pages, then save."
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -169,7 +169,7 @@
         </div>
 
         <div class="group" role="group" aria-label="Export">
-          <button type="button" class="btn" id="json-btn" title="View annotation JSON">
+          <button type="button" class="btn" id="json-btn" title="View or edit annotation JSON">
             <svg><use href="#icon-json" /></svg>
             <span>JSON</span>
           </button>
@@ -186,9 +186,10 @@
         <p>Open a PDF to start annotating, drop a file here.</p>
         <div class="empty-actions">
           <button type="button" class="btn primary" id="empty-open">Open PDF</button>
+          <button type="button" class="btn" id="empty-blank">Blank page</button>
         </div>
-        <p id="error" class="error" hidden></p>
       </div>
+      <p id="error" class="error" hidden></p>
       <p id="loading" class="loading" hidden>Loading PDF…</p>
       <div id="pdf-container" class="pages" hidden></div>
     </main>
@@ -197,17 +198,31 @@
       <div class="dialog-head">
         <h2>Annotation JSON</h2>
         <div class="dialog-actions">
+          <button type="button" class="btn" id="apply-json">Apply</button>
           <button type="button" class="btn" id="copy-json">Copy</button>
           <button type="button" class="icon-btn" id="close-json" aria-label="Close">
             <svg><use href="#icon-close" /></svg>
           </button>
         </div>
       </div>
-      <pre id="json-output" class="json-output"></pre>
+      <label class="json-label" for="json-output">Edit JSON, then Apply. It is validated first; page count must match the open document.</label>
+      <textarea id="json-output" class="json-output" spellcheck="false"></textarea>
+      <p id="json-error" class="json-error" hidden></p>
     </dialog>
 
+    <!-- Classic scripts only: ES modules and Web Workers are blocked on file://. -->
     <script src="lib/fabric.min.js"></script>
-    <script src="lib/jspdf.umd.min.js"></script>
-    <script type="module" src="app.js"></script>
+    <script src="lib/pdf-lib.min.js"></script>
+    <script>
+      // PDF.js 6 expects the Iterator global; older browsers do not provide it.
+      if (typeof Iterator === "undefined") {
+        window.Iterator = { prototype: {} };
+      }
+    </script>
+    <script src="lib/pdf.worker.min.js"></script>
+    <script src="lib/pdf.min.js"></script>
+    <script src="annotation-json.js"></script>
+    <script src="annotator.js"></script>
+    <script src="app.js"></script>
   </body>
 </html>
